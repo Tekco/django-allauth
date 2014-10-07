@@ -1,3 +1,4 @@
+import re
 import warnings
 import json
 
@@ -21,6 +22,11 @@ from ..utils import (import_attribute, get_user_model,
                      resolve_url)
 
 from . import app_settings
+
+# Don't bother turning this into a setting, as changing this also
+# requires changing the accompanying form error message. So if you
+# need to change any of this, simply override clean_username().
+USERNAME_REGEX = re.compile(r'^[\w.@+-]+$', re.UNICODE)
 
 
 class DefaultAccountAdapter(object):
@@ -110,7 +116,7 @@ class DefaultAccountAdapter(object):
 
     def get_logout_redirect_url(self, request):
         """
-        Returns the URL to redriect to after the user logs out. Note that
+        Returns the URL to redirect to after the user logs out. Note that
         this method is also invoked if you attempt to log out while no users
         is logged in. Therefore, request.user is not guaranteed to be an
         authenticated user.
@@ -197,14 +203,13 @@ class DefaultAccountAdapter(object):
         Validates the username. You can hook into this if you want to
         (dynamically) restrict what usernames can be chosen.
         """
-        from django.contrib.auth.forms import UserCreationForm
-        USERNAME_REGEX = UserCreationForm().fields['username'].regex
         if not USERNAME_REGEX.match(username):
             raise forms.ValidationError(_("Usernames can only contain "
                                           "letters, digits and @/./+/-/_."))
 
         # TODO: Add regexp support to USERNAME_BLACKLIST
-        username_blacklist_lower = [ub.lower() for ub in app_settings.USERNAME_BLACKLIST]
+        username_blacklist_lower = [ub.lower()
+                                    for ub in app_settings.USERNAME_BLACKLIST]
         if username.lower() in username_blacklist_lower:
             raise forms.ValidationError(_("Username can not be used. "
                                           "Please use other username."))
@@ -225,6 +230,17 @@ class DefaultAccountAdapter(object):
         (dynamically) restrict what email addresses can be chosen.
         """
         return email
+
+    def clean_password(self, password):
+        """
+        Validates a password. You can hook into this if you want to
+        restric the allowed password choices.
+        """
+        min_length = app_settings.PASSWORD_MIN_LENGTH
+        if len(password) < min_length:
+            raise forms.ValidationError(_("Password must be a minimum of {0} "
+                                          "characters.").format(min_length))
+        return password
 
     def add_message(self, request, level, message_template,
                     message_context={}, extra_tags=''):

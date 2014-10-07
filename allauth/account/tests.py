@@ -73,7 +73,7 @@ class AccountTests(TestCase):
     def test_signup_other_email_verified_externally(self):
         """
         John is invited on john@work.com, but signs up via john@home.com.
-        E-mail verification is by-passed, his home e-mail address is
+        E-mail verification is by-passed, their home e-mail address is
         used as a secondary.
         """
         user = self._test_signup_email_verified_externally('john@home.com',
@@ -157,24 +157,43 @@ class AccountTests(TestCase):
         resp = c.get(reverse(urlname))
         return resp
 
-    def test_password_forgotten_url_protocol(self):
-        c = Client()
+    @override_settings(
+        ACCOUNT_AUTHENTICATION_METHOD=app_settings.AuthenticationMethod.USERNAME)
+    def test_password_forgotten_username_hint(self):
+        self._request_new_password()
+        body = mail.outbox[0].body
+        assert 'username' in body
+
+    @override_settings(
+        ACCOUNT_AUTHENTICATION_METHOD=app_settings.AuthenticationMethod.EMAIL)
+    def test_password_forgotten_no_username_hint(self):
+        self._request_new_password()
+        body = mail.outbox[0].body
+        assert 'username' not in body
+
+    def _request_new_password(self):
         user = User.objects.create(username='john',
                                    email='john@doe.org',
                                    is_active=True)
         user.set_password('doe')
         user.save()
-        resp = c.post(reverse('account_reset_password'),
-                      data={'email': 'john@doe.org'})
+        self.client.post(
+            reverse('account_reset_password'),
+            data={'email': 'john@doe.org'})
         self.assertEqual(len(mail.outbox), 1)
         self.assertEqual(mail.outbox[0].to, ['john@doe.org'])
+        return user
+
+    def test_password_forgotten_url_protocol(self):
+        user = self._request_new_password()
         body = mail.outbox[0].body
         self.assertGreater(body.find('https://'), 0)
         url = body[body.find('/password/reset/'):].split()[0]
-        resp = c.get(url)
+        resp = self.client.get(url)
         self.assertTemplateUsed(resp, 'account/password_reset_from_key.html')
-        c.post(url, {'password1': 'newpass123',
-                     'password2': 'newpass123'})
+        self.client.post(url,
+                         {'password1': 'newpass123',
+                          'password2': 'newpass123'})
         user = User.objects.get(pk=user.pk)
         self.assertTrue(user.check_password('newpass123'))
         return resp
@@ -190,6 +209,7 @@ class AccountTests(TestCase):
                       follow=True)
         self.assertEqual(resp.status_code, 200)
         self.assertEqual(mail.outbox[0].to, ['john@doe.com'])
+        self.assertGreater(mail.outbox[0].body.find('https://'), 0)
         self.assertEqual(len(mail.outbox), 1)
         self.assertTemplateUsed(resp,
                                 'account/verification_sent.html')

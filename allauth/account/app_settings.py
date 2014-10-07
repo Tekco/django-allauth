@@ -185,7 +185,7 @@ class AppSettings(object):
     @property
     def LOGIN_ON_EMAIL_CONFIRMATION(self):
         """
-        Autmatically log the user in once he confirmed his email address
+        Autmatically log the user in once they confirmed their email address
         """
         return self._setting('LOGIN_ON_EMAIL_CONFIRMATION', True)
 
@@ -221,6 +221,10 @@ class AppSettings(object):
         remember.
         """
         return self._setting('SESSION_REMEMBER', None)
+
+    @property
+    def FORMS(self):
+        return self._setting('FORMS', {})
 
 
 # Ugly? Guido recommends this himself ...

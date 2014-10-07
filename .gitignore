@@ -3,6 +3,7 @@
 .idea
 .project
 .pydevproject
+*.geany
 docs/_build
 build
 dist
@@ -17,3 +18,5 @@ pep8.txt
 *.tmp
 virtualenv
 .DS_Store
+
+*.prefs

@@ -13,7 +13,7 @@ from django.contrib.auth.tokens import default_token_generator
 from django.shortcuts import redirect
 
 from ..exceptions import ImmediateHttpResponse
-from ..utils import get_user_model
+from ..utils import get_user_model, get_form_class
 
 from .utils import (get_next_redirect_url, complete_signup,
                     get_login_redirect_url, perform_login,
@@ -89,6 +89,9 @@ class LoginView(RedirectAuthenticatedUserMixin,
     success_url = None
     redirect_field_name = "next"
 
+    def get_form_class(self):
+        return get_form_class(app_settings.FORMS, 'login', self.form_class)
+
     def form_valid(self, form):
         success_url = self.get_success_url()
         return form.login(self.request, redirect_url=success_url)
@@ -149,6 +152,9 @@ class SignupView(RedirectAuthenticatedUserMixin, CloseableSignupMixin,
     form_class = SignupForm
     redirect_field_name = "next"
     success_url = None
+
+    def get_form_class(self):
+        return get_form_class(app_settings.FORMS, 'signup', self.form_class)
 
     def get_success_url(self):
         # Explicitly passed ?next= URL takes precedence
@@ -228,11 +234,11 @@ class ConfirmEmailView(TemplateResponseMixin, View):
         do not take proper care (e.g. don't purge used email
         confirmations), a malicious person that got hold of the link
         will be able to login over and over again and the user is
-        unable to do anything about it. Even restoring his own mailbox
+        unable to do anything about it. Even restoring their own mailbox
         security will not help, as the links will still work. For
         password reset this is different, this mechanism works only as
-        long as the attacker has access to the mailbox. If he no
-        longer has access he cannot issue a password request and
+        long as the attacker has access to the mailbox. If they no
+        longer has access they cannot issue a password request and
         intercept it. Furthermore, all places where the links are
         listed (log files, but even Google Analytics) all of a sudden
         need to be secured. Purging the email confirmation once
@@ -280,6 +286,9 @@ class EmailView(FormView):
     template_name = "account/email.html"
     form_class = AddEmailForm
     success_url = reverse_lazy('account_email')
+
+    def get_form_class(self):
+        return get_form_class(app_settings.FORMS, 'add_email', self.form_class)
 
     def dispatch(self, request, *args, **kwargs):
         sync_user_email_addresses(request.user)
@@ -420,6 +429,11 @@ class PasswordChangeView(FormView):
     form_class = ChangePasswordForm
     success_url = reverse_lazy("account_change_password")
 
+    def get_form_class(self):
+        return get_form_class(app_settings.FORMS,
+                              'change_password',
+                              self.form_class)
+
     def dispatch(self, request, *args, **kwargs):
         if not request.user.has_usable_password():
             return HttpResponseRedirect(reverse('account_set_password'))
@@ -456,6 +470,11 @@ class PasswordSetView(FormView):
     form_class = SetPasswordForm
     success_url = reverse_lazy("account_set_password")
 
+    def get_form_class(self):
+        return get_form_class(app_settings.FORMS,
+                              'set_password',
+                              self.form_class)
+
     def dispatch(self, request, *args, **kwargs):
         if request.user.has_usable_password():
             return HttpResponseRedirect(reverse('account_change_password'))
@@ -490,8 +509,13 @@ class PasswordResetView(FormView):
     form_class = ResetPasswordForm
     success_url = reverse_lazy("account_reset_password_done")
 
+    def get_form_class(self):
+        return get_form_class(app_settings.FORMS,
+                              'reset_password',
+                              self.form_class)
+
     def form_valid(self, form):
-        form.save()
+        form.save(self.request)
         return super(PasswordResetView, self).form_valid(form)
 
     def get_context_data(self, **kwargs):
@@ -515,6 +539,11 @@ class PasswordResetFromKeyView(FormView):
     form_class = ResetPasswordKeyForm
     token_generator = default_token_generator
     success_url = reverse_lazy("account_reset_password_from_key_done")
+
+    def get_form_class(self):
+        return get_form_class(app_settings.FORMS,
+                              'reset_password_from_key',
+                              self.form_class)
 
     def _get_user(self, uidb36):
         # pull out user
